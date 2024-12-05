@@ -1,27 +1,14 @@
-# streamlit run app.py
+# 터미널에서 실행: streamlit run app.py
 import streamlit as st
 from openai import OpenAI
 
-api_key = "sk-"
-client = OpenAI(api_key=api_key)
 
+# OpenAI API 설정
+api_key = "sk-"  # OpenAI API Key
 st.session_state['api_key'] = api_key
-if 'openai_client' in st.session_state:
-    client = st.session_state['openai_client']
-else:
-    client = OpenAI(api_key=api_key)
-    st.session_state['openai_client'] = client
 
-
-
-st.header("부산 종합 현지인 가이드 챗봇")
-
-col1, col2, col3, col4, col5 = st.columns(5)
-with col5:
-    if st.button("Clear"):
-        st.session_state.messages = []
-        del st.session_state.thread
-
+client = OpenAI(api_key=api_key)
+st.session_state['openai_client'] = client
 
 # 부산 가이드 챗봇 데이터 변수 설정
 city_info = {
@@ -115,34 +102,48 @@ system_prompt = f"""
 질문에 따라 부산의 명소, 맛집, 교통수단 등 맞춤형 정보를 제공하고, 요청에 따라 실시간 정보를 안내하라. 친절하고 이해하기 쉬운 어조로 응답하라.
 """
 
+st.header("부산 종합 현지인 가이드 챗봇")
 
+col1, col2, col3, col4, col5 = st.columns(5)
+with col5:
+    if st.button("Clear"):
+        st.session_state.messages = []
+        if "thread" in st.session_state:
+            del st.session_state.thread
+        st.session_state.chatbot_messages = [
+        {"role":"system","content": system_prompt}
+        ]
 
-
+# 메시지 출력 함수
 def show_message(msg):
     with st.chat_message(msg['role']):
         st.markdown(msg["content"])
 
-
-client = st.session_state.get('openai_client', None)
-
+# 초기화
 if "chatbot_messages" not in st.session_state:
     st.session_state.chatbot_messages = [
         {"role":"system","content": system_prompt}
     ]
 
+if "thread" not in st.session_state:
+    st.session_state.thread = client.beta.threads.create()
 
+# 이전 메시지 표시
 for msg in st.session_state.chatbot_messages[1:]:
     show_message(msg)
 
-if prompt := st.chat_input("What is up?"):
+# 사용자 입력 처리
+if prompt := st.chat_input("메시지를 입력하세요 (Type a message)"):
     msg = {"role":"user", "content":prompt}
     show_message(msg)
     st.session_state.chatbot_messages.append(msg)
 
+    # GPT 응답 생성
     response = client.chat.completions.create(
         model = "gpt-4o-mini",
         messages = st.session_state.chatbot_messages
     )
     msg = {"role":"assistant", "content":response.choices[0].message.content}
     show_message(msg)
+
     st.session_state.chatbot_messages.append(msg)
